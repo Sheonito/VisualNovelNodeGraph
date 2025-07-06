@@ -58,20 +58,39 @@ export default function App() {
   };
 
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
-      <button
-        onClick={addNode}
-        style={{
-          position: 'absolute',
-          zIndex: 10,
-          top: 10,
-          left: 10,
-          padding: '8px 12px',
-          fontSize: '14px',
-        }}
-      >
-        ➕ 노드 추가
-      </button>
+<div style={{ width: '100vw', height: '100vh' }}>
+  <button
+    onClick={addNode}
+    style={{
+      position: 'absolute',
+      zIndex: 10,
+      top: 16,
+      left: 16,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '8px 14px',
+      fontSize: '14px',
+      fontWeight: '500',
+      border: '1px solid #555',
+      borderRadius: '8px',
+      backgroundColor: '#2b2b2b',
+      color: 'white',
+      fontFamily: '"Noto Sans KR", sans-serif',
+      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+      cursor: 'pointer',
+      transition: 'background 0.2s, transform 0.1s',
+    }}
+    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#3c3c3c')}
+    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#2b2b2b')}
+    onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
+    onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+  >
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
+    <path d="M19 13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+  </svg>
+    <span>노드 추가</span>
+  </button>
 
       <ReactFlow
         nodes={nodes}
@@ -80,9 +99,9 @@ export default function App() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
-        nodesDraggable={true}         // ✅ 노드 드래그 허용
-        elementsSelectable={true}     // ✅ 노드 선택 가능
-        nodesConnectable={true}       // ✅ 포트 연결 허용
+        nodesDraggable={true}
+        elementsSelectable={true}
+        nodesConnectable={true}
         fitView
       >
         <MiniMap />
