@@ -2,7 +2,7 @@
   "name": "noveltext",
   "version": "1.0.0",
   "description": "",
-    "engines": {
+  "engines": {
     "vscode": "^1.70.0"
   },
   "main": "dist/extension.js",
@@ -18,7 +18,8 @@
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-flow-renderer": "^10.3.17"
+    "react-flow-renderer": "^10.3.17",
+    "reactflow": "^11.11.4"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
@@ -39,13 +40,13 @@
       }
     ],
     "menus": {
-    "editor/title": [
-      {
-        "command": "vnGraph.showGraph",
-        "when": "resourceExtname == .txt || resourceExtname == .vn",
-        "group": "navigation"
-      }
-    ]
-   }
+      "editor/title": [
+        {
+          "command": "vnGraph.showGraph",
+          "when": "resourceExtname == .txt || resourceExtname == .vn",
+          "group": "navigation"
+        }
+      ]
+    }
   }
 }
