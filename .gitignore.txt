@@ -1,0 +1,20 @@
+# node_modules는 절대 올리지 않음
+node_modules/
+
+# 빌드된 JS 파일은 버전 관리 안 함
+dist/
+
+# macOS 시스템 파일
+.DS_Store
+
+# Windows 시스템 파일
+Thumbs.db
+
+# VS Code 설정 (개인 설정)
+.vscode/
+
+# TypeScript 컴파일 캐시
+*.tsbuildinfo
+
+# 로그 파일 (선택)
+*.log
