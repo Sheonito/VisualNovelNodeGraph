@@ -103,6 +103,8 @@ export default function App() {
         elementsSelectable={true}
         nodesConnectable={true}
         fitView
+        selectionOnDrag
+        multiSelectionKeyCode="Control"
       >
         <MiniMap />
         <Controls />
