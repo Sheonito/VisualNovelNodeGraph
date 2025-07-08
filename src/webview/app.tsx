@@ -9,6 +9,7 @@ import ReactFlow, {
   Connection,
   Edge,
   Node,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -41,16 +42,19 @@ export default function App() {
     []
   );
 
-  const addNode = () => {
+  const { project } = useReactFlow();
+
+  const addNode = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+    const canvasPosition = project({ x: mouseX, y: mouseY });
     const newId = `${++nodeId}`;
+    
     setNodes((nds) => [
       ...nds,
       {
         id: newId,
-        position: {
-          x: Math.random() * 500 + 100,
-          y: Math.random() * 300 + 100,
-        },
+        position: canvasPosition,
         data: { label: `노드 ${newId}` },
         type: 'custom',
       },
