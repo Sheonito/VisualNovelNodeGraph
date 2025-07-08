@@ -1,20 +1,23 @@
 import React from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeProps } from 'reactflow';
 
-export default function CustomNode({ data }: any) {
+export default function CustomNode({ data, selected }: NodeProps) {
   return (
     <div
       style={{
         padding: 8,
-        border: '1px solid #555',
-        borderRadius: 4,
+        border: '2px solid',
+        borderRadius: 6,
         backgroundColor: '#222',
         color: 'white',
         fontSize: 14,
         textAlign: 'center',
         minWidth: 80,
         maxWidth: 140,
-        position: 'relative', // ✅ 필수
+        position: 'relative',
+        borderColor: selected ? '#4FC3F7' : '#555', // ✅ 선택 시 하늘색
+        boxShadow: selected ? '0 0 8px rgba(79, 195, 247, 0.6)' : 'none', // ✅ glow 효과
+        transition: 'border-color 0.2s, box-shadow 0.2s', // 부드럽게
       }}
     >
       {/* 입력 포트 */}
