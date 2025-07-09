@@ -66,19 +66,37 @@ export default function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Delete') {
+        // 선택된 노드와 엣지 모두 가져오기
+        const selectedNodeIds = getNodes()
+          .filter((node) => node.selected)
+          .map((node) => node.id);
+
         const selectedEdgeIds = getEdges()
           .filter((edge) => edge.selected)
           .map((edge) => edge.id);
 
-        if (selectedEdgeIds.length === 0) return;
+        // 노드 삭제
+        if (selectedNodeIds.length > 0) {
+          setNodes((nds) => nds.filter((node) => !selectedNodeIds.includes(node.id)));
+          setEdges((eds) =>
+            eds.filter(
+              (edge) =>
+                !selectedNodeIds.includes(edge.source) &&
+                !selectedNodeIds.includes(edge.target)
+            )
+          );
+        }
 
-        setEdges((eds) => eds.filter((edge) => !selectedEdgeIds.includes(edge.id)));
+        // 엣지만 선택됐을 경우 삭제
+        if (selectedEdgeIds.length > 0) {
+          setEdges((eds) => eds.filter((edge) => !selectedEdgeIds.includes(edge.id)));
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setEdges]);
+  }, [setNodes, setEdges, getNodes, getEdges]);
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
