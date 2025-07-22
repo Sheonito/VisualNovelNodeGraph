@@ -17,11 +17,11 @@ export function activate(context: vscode.ExtensionContext) {
         }
       );
 
-      // HTML 원본 경로
+      // HTML 파일 경로
       const htmlPath = path.join(context.extensionPath, 'dist/index.html');
       let html = fs.readFileSync(htmlPath, 'utf8');
 
-      // 🔹 Webview에서 접근 가능한 URI로 변환
+      // 🔹 Webview 전용 URI로 변환
       const scriptUri = panel.webview.asWebviewUri(
         vscode.Uri.file(path.join(context.extensionPath, 'dist', 'main.js'))
       );
@@ -29,17 +29,23 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.Uri.file(path.join(context.extensionPath, 'dist', 'main.css'))
       );
 
-      // 🔹 main.js 경로 교체
-      html = html.replace('./main.js', scriptUri.toString());
+      // 🔹 CSP 보안 정책 추가
+      const csp = `
+        <meta http-equiv="Content-Security-Policy" content="
+          default-src 'none';
+          style-src ${panel.webview.cspSource};
+          script-src ${panel.webview.cspSource};
+        ">`;
 
-      // 🔹 main.css 링크 삽입
-      html = html.replace(
-        '</head>',
-        `<link rel="stylesheet" href="${styleUri}"></head>`
-      );
+      // 🔹 HTML 수정: 경로와 CSP 삽입
+      html = html
+        .replace('./main.js', scriptUri.toString())
+        .replace('</head>', `${csp}\n<link rel="stylesheet" href="${styleUri}">\n</head>`);
 
-      // Webview에 HTML 출력
+      // Webview에 HTML 설정
       panel.webview.html = html;
     })
   );
 }
+
+export function deactivate() {}

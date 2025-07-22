@@ -5,6 +5,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,
+    "sourceMap": true,
     "esModuleInterop": true,
     "jsx": "react-jsx"
   },

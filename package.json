@@ -9,8 +9,10 @@
   "scripts": {
     "build": "npm run build:ext && npm run build:web && npm run copy:html",
     "build:ext": "esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js",
-    "build:web": "esbuild src/webview/main.tsx --bundle --outfile=dist/main.js --loader:.tsx=tsx --loader:.ts=ts --jsx=automatic",
-    "copy:html": "cp src/webview/index.html dist/index.html"
+    "build:web": "esbuild src/webview/main.tsx --bundle --sourcemap --outfile=dist/main.js --loader:.tsx=tsx --loader:.ts=ts --jsx=automatic",
+    "copy:html": "cp src/webview/index.html dist/index.html",
+    "dev:web": "esbuild src/webview/main.tsx --bundle --outfile=dist/main.js --loader:.tsx=tsx --loader:.ts=ts --jsx=automatic --watch --servedir=dist",
+    "dev:ext": "esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js --watch"
   },
   "keywords": [],
   "author": "",
@@ -19,15 +21,18 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-flow-renderer": "^10.3.17",
-    "reactflow": "^11.11.4"
+    "reactflow": "^11.11.4",
+    "use-undo": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
     "@types/react": "^19.1.5",
     "@types/react-dom": "^19.1.5",
     "@types/vscode": "^1.100.0",
+    "electron": "^37.2.3",
     "esbuild": "^0.25.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vite": "^7.0.5"
   },
   "activationEvents": [
     "onCommand:vnGraph.showGraph"
