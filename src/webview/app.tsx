@@ -1,30 +1,24 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
   addEdge,
-  useEdgesState,
-  useNodesState,
+  applyNodeChanges,
+  applyEdgeChanges,
   Connection,
   Edge,
   Node,
+  NodeChange,
+  EdgeChange,
   useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import CustomNode from './CustomNode';
+import useUndo from 'use-undo';
 
 let nodeId = 1;
-
-const initialNodes: Node[] = [
-  {
-    id: '1',
-    position: { x: 100, y: 100 },
-    data: { label: '시작 노드' },
-    type: 'custom',
-  },
-];
 
 const initialEdges: Edge[] = [];
 
@@ -33,70 +27,192 @@ const nodeTypes = {
 };
 
 export default function App() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const { project, getNodes, getEdges } = useReactFlow();
 
-  const { project, getNodes } = useReactFlow();
+  const [
+    state,
+    {
+      set: setState,
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+    },
+  ] = useUndo<{ nodes: Node[]; edges: Edge[] }>({
+    nodes: [],
+    edges: [],
+  });
 
-  const onConnect = useCallback(
-    (connection: Connection) =>
-      setEdges((eds) => addEdge({ ...connection, animated: true }, eds)),
-    []
-  );
+  const nodes = state.present.nodes;
+  const edges = state.present.edges;
 
-  const addNode = (e: React.MouseEvent<HTMLButtonElement>) => {
+  // ✅ 최신 상태 ref로 추적
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+
+  const isInternalUpdate = useRef(false);
+  const isUndoing = useRef(false);
+  const isRedoing = useRef(false);
+
+  const tracedSetState = (newState: { nodes: Node[]; edges: Edge[] }) => {
+    console.log('📌 setState 호출됨');
+    console.log('새로운 상태:',newState.nodes.length,', ',newState.edges.length);
+    setState(newState);
+  };
+
+  useEffect(() => {
+    console.log('🕒 현재 상태 업데이트됨');
+    console.log('present:',state.present.nodes);
+    console.log('past length:',state.past.length);
+    console.log('future length:',state.future.length);
+    nodesRef.current = nodes;
+    edgesRef.current = edges;
+  }, [nodes, edges]);
+
+  // ✅ 노드 라벨 변경
+  function handleLabelChange(id: string, newLabel: string) {
+    const current = nodesRef.current.find((n) => n.id === id);
+    const currentLabel = current?.data.label;
+    console.log('newLabel: ',newLabel);
+    console.log('currentLabel: ',currentLabel);
+
+
+    if (currentLabel === newLabel) {
+      console.log(`⚠️ 라벨 동일 → setState 생략됨`);
+      return; // 아무것도 안 바뀜
+    }
+
+    const updated = nodesRef.current.map((node) =>
+      node.id === id ? { ...node, data: { ...node.data, label: newLabel } } : node
+    );
+
+    tracedSetState({ nodes: updated, edges: edgesRef.current });
+  }
+
+  function handleEditChange(id: string, isEditing: boolean) {
+    console.log('isEditing:', isEditing);
+  }
+
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+
+    console.log('onNodesChange',changes);
+    const filtered = changes.filter(change => {
+      if (change.type === 'position') {
+        return change.dragging === true;
+      }
+
+      return change.type !== 'dimensions';
+    });
+
+    const updated = applyNodeChanges(filtered, nodesRef.current);
+
+    if (isInternalUpdate.current || isUndoing.current || isRedoing.current) {
+      nodesRef.current = updated;
+      return;
+    }
+
+    if (filtered.length === 0)
+      return;
+    console.log('onNodesChange: ', filtered.length);
+    tracedSetState({ nodes: updated, edges: edgesRef.current });
+  }, [tracedSetState]);
+
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    const updated = applyEdgeChanges(changes, edgesRef.current);
+    tracedSetState({ nodes: nodesRef.current, edges: updated });
+  }, [tracedSetState]);
+
+  const onConnect = useCallback((connection: Connection) => {
+    const newEdges = addEdge({ ...connection, animated: true }, edgesRef.current);
+    tracedSetState({ nodes: nodesRef.current, edges: newEdges });
+  }, [tracedSetState]);
+
+  const  addNode = (e: React.MouseEvent<HTMLButtonElement>) => {
     const mouseX = e.clientX;
     const mouseY = e.clientY;
     const canvasPosition = project({ x: mouseX, y: mouseY });
     const newId = `${++nodeId}`;
 
-    setNodes((nds) => [
-      ...nds,
-      {
-        id: newId,
-        position: canvasPosition,
-        data: { label: `노드 ${newId}` },
-        type: 'custom',
+    const newNode: Node = {
+      id: newId,
+      position: canvasPosition,
+      data: {
+        label: `노드 ${newId}`,
+        onEditChange: handleEditChange,
+        onLabelChange: handleLabelChange,
       },
-    ]);
+      type: 'custom',
+    };
+
+    console.log(`노드 ${newId} 추가됨`);
+
+    isInternalUpdate.current = true;
+    tracedSetState({
+      nodes: [...nodesRef.current.map(n => ({ ...n })), newNode],
+      edges: [...edgesRef.current.map(e => ({ ...e }))],
+    });
+
+    setTimeout(() => {
+      isInternalUpdate.current = false;
+    }, 0); // 다음 프레임에서 다시 허용
   };
 
-  const { getEdges } = useReactFlow();
-  // ✅ Delete 키로 선택 노드의 연결 edge 제거
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Delete') {
-        // 선택된 노드와 엣지 모두 가져오기
-        const selectedNodeIds = getNodes()
-          .filter((node) => node.selected)
-          .map((node) => node.id);
+        const selectedNodeIds = getNodes().filter(n => n.selected).map(n => n.id);
+        const selectedEdgeIds = getEdges().filter(e => e.selected).map(e => e.id);
 
-        const selectedEdgeIds = getEdges()
-          .filter((edge) => edge.selected)
-          .map((edge) => edge.id);
+        let updatedNodes = nodesRef.current;
+        let updatedEdges = edgesRef.current;
 
-        // 노드 삭제
         if (selectedNodeIds.length > 0) {
-          setNodes((nds) => nds.filter((node) => !selectedNodeIds.includes(node.id)));
-          setEdges((eds) =>
-            eds.filter(
-              (edge) =>
-                !selectedNodeIds.includes(edge.source) &&
-                !selectedNodeIds.includes(edge.target)
-            )
+          updatedNodes = updatedNodes.filter(
+            (node) => !selectedNodeIds.includes(node.id)
+          );
+          updatedEdges = updatedEdges.filter(
+            (edge) =>
+              !selectedNodeIds.includes(edge.source) &&
+              !selectedNodeIds.includes(edge.target)
           );
         }
 
-        // 엣지만 선택됐을 경우 삭제
         if (selectedEdgeIds.length > 0) {
-          setEdges((eds) => eds.filter((edge) => !selectedEdgeIds.includes(edge.id)));
+          updatedEdges = updatedEdges.filter(
+            (edge) => !selectedEdgeIds.includes(edge.id)
+          );
         }
+
+        tracedSetState({ nodes: updatedNodes, edges: updatedEdges });
+      }
+
+      if (e.ctrlKey && e.key === 'z') {
+        console.log('canUndo: ',canUndo);
+        console.log('present:',state.present);
+        console.log('past length:',state.past.length);
+        console.log('future length:',state.future.length);
+        if (canUndo) {
+          isUndoing.current = true;
+          undo()
+          setTimeout(() => {
+            isUndoing.current = false;
+          }, 0);
+        };
+      } else if (e.ctrlKey && e.key === 'y') {
+        if (canRedo) {
+          isRedoing.current = true;
+          redo()
+          setTimeout(() => {
+            isRedoing.current = false;
+          }, 0);
+        };
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setNodes, setEdges, getNodes, getEdges]);
+  }, [getNodes, getEdges, canUndo, canRedo, undo, redo, tracedSetState]);
+
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
@@ -107,12 +223,8 @@ export default function App() {
           zIndex: 10,
           top: 16,
           left: 16,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
           padding: '8px 14px',
           fontSize: '14px',
-          fontWeight: '500',
           border: '1px solid #555',
           borderRadius: '8px',
           backgroundColor: '#2b2b2b',
@@ -120,17 +232,9 @@ export default function App() {
           fontFamily: '"Noto Sans KR", sans-serif',
           boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
           cursor: 'pointer',
-          transition: 'background 0.2s, transform 0.1s',
         }}
-        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#3c3c3c')}
-        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#2b2b2b')}
-        onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
-        onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24">
-          <path d="M19 13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
-        </svg>
-        <span>노드 추가</span>
+        + 노드 추가
       </button>
 
       <ReactFlow
@@ -140,9 +244,6 @@ export default function App() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
-        nodesDraggable={true}
-        elementsSelectable={true}
-        nodesConnectable={true}
         fitView
         selectionOnDrag
         multiSelectionKeyCode="Control"
