@@ -95,7 +95,6 @@ export default function App() {
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
 
-    console.log('onNodesChange',changes);
     const filtered = changes.filter(change => {
       if (change.type === 'position') {
         return change.dragging === true;
@@ -113,7 +112,6 @@ export default function App() {
 
     if (filtered.length === 0)
       return;
-    console.log('onNodesChange: ', filtered.length);
     tracedSetState({ nodes: updated, edges: edgesRef.current });
   }, [tracedSetState]);
 
@@ -137,7 +135,7 @@ export default function App() {
       id: newId,
       position: canvasPosition,
       data: {
-        label: `노드 ${newId}`,
+        label: `New Node`,
         onEditChange: handleEditChange,
         onLabelChange: handleLabelChange,
       },
