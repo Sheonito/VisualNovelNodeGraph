@@ -46,9 +46,11 @@ export default function App() {
   const nodes = state.present.nodes;
   const edges = state.present.edges;
 
-  // ✅ 최신 상태 ref로 추적
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
+
+  // 복사 노드
+  const clipboardRef = useRef<Node[]>([]);
 
   const isInternalUpdate = useRef(false);
   const isUndoing = useRef(false);
@@ -57,15 +59,15 @@ export default function App() {
 
   const tracedSetState = (newState: { nodes: Node[]; edges: Edge[] }) => {
     console.log('📌 setState 호출됨');
-    console.log('새로운 상태:',newState.nodes.length,', ',newState.edges.length);
+    console.log('새로운 상태:', newState.nodes.length, ', ', newState.edges.length);
     setState(newState);
   };
 
   useEffect(() => {
     console.log('🕒 현재 상태 업데이트됨');
-    console.log('present:',state.present.nodes);
-    console.log('past length:',state.past.length);
-    console.log('future length:',state.future.length);
+    console.log('present:', state.present.nodes);
+    console.log('past length:', state.past.length);
+    console.log('future length:', state.future.length);
     nodesRef.current = nodes;
     edgesRef.current = edges;
   }, [nodes, edges]);
@@ -74,8 +76,8 @@ export default function App() {
   function handleLabelChange(id: string, newLabel: string) {
     const current = nodesRef.current.find((n) => n.id === id);
     const currentLabel = current?.data.label;
-    console.log('newLabel: ',newLabel);
-    console.log('currentLabel: ',currentLabel);
+    console.log('newLabel: ', newLabel);
+    console.log('currentLabel: ', currentLabel);
 
 
     if (currentLabel === newLabel) {
@@ -97,9 +99,9 @@ export default function App() {
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
 
-    if(_isEditing.current == true)
+    if (_isEditing.current == true)
       return;
-    
+
     const filtered = changes.filter(change => {
       if (change.type === 'position') {
         return change.dragging === true;
@@ -130,7 +132,7 @@ export default function App() {
     tracedSetState({ nodes: nodesRef.current, edges: newEdges });
   }, [tracedSetState]);
 
-  const  addNode = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const addNode = (e: React.MouseEvent<HTMLButtonElement>) => {
     const mouseX = e.clientX;
     const mouseY = e.clientY;
     const canvasPosition = project({ x: mouseX, y: mouseY });
@@ -190,10 +192,10 @@ export default function App() {
       }
 
       if (e.ctrlKey && e.key === 'z') {
-        console.log('canUndo: ',canUndo);
-        console.log('present:',state.present);
-        console.log('past length:',state.past.length);
-        console.log('future length:',state.future.length);
+        console.log('canUndo: ', canUndo);
+        console.log('present:', state.present);
+        console.log('past length:', state.past.length);
+        console.log('future length:', state.future.length);
         if (canUndo) {
           isUndoing.current = true;
           undo()
@@ -209,6 +211,44 @@ export default function App() {
             isRedoing.current = false;
           }, 0);
         };
+      }
+
+      if (e.ctrlKey && e.key === 'c') {
+        const selected = getNodes().filter(n => n.selected);
+        if (selected.length > 0) {
+          clipboardRef.current = selected.map(n => ({ ...n }));
+          console.log('📋 복사됨:', clipboardRef.current);
+        }
+      }
+
+      if (e.ctrlKey && e.key === 'v') {
+        const copied = clipboardRef.current;
+        if (copied.length === 0) return;
+
+        const offset = { x: 40, y: 40 }; // 위치 조금 이동해서 붙여넣기
+        const newNodes = copied.map(original => {
+          const newId = `${++nodeId}`;
+          return {
+            ...original,
+            id: newId,
+            position: {
+              x: original.position.x + offset.x,
+              y: original.position.y + offset.y,
+            },
+            data: {
+              ...original.data,
+              label: original.data.label + ' (복사됨)',
+              onLabelChange: handleLabelChange,
+              onEditChange: handleEditChange,
+            },
+            selected: false,
+          };
+        });
+
+        tracedSetState({
+          nodes: [...nodesRef.current.map(n => ({ ...n })), ...newNodes],
+          edges: [...edgesRef.current.map(e => ({ ...e }))],
+        });
       }
     };
 
@@ -247,8 +287,8 @@ export default function App() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
-        nodesDraggable = {!_isEditing.current}
-        panOnDrag = {!_isEditing.current}
+        nodesDraggable={!_isEditing.current}
+        panOnDrag={!_isEditing.current}
         fitView
         selectionOnDrag
         multiSelectionKeyCode="Control"
