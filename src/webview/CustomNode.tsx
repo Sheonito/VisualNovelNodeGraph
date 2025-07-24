@@ -43,7 +43,7 @@ export default function CustomNode({ data, selected, id }: NodeProps) {
   function handleDoubleClick() {
     originalLabel.current = label;
     setIsEditing(true);
-    data.onEditChange?.(id, false);
+    data.onEditChange?.(id, true);
   }
 
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {

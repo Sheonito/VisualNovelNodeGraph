@@ -53,6 +53,7 @@ export default function App() {
   const isInternalUpdate = useRef(false);
   const isUndoing = useRef(false);
   const isRedoing = useRef(false);
+  const _isEditing = useRef(false);
 
   const tracedSetState = (newState: { nodes: Node[]; edges: Edge[] }) => {
     console.log('📌 setState 호출됨');
@@ -91,10 +92,14 @@ export default function App() {
 
   function handleEditChange(id: string, isEditing: boolean) {
     console.log('isEditing:', isEditing);
+    _isEditing.current = isEditing;
   }
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
 
+    if(_isEditing.current == true)
+      return;
+    
     const filtered = changes.filter(change => {
       if (change.type === 'position') {
         return change.dragging === true;
@@ -242,6 +247,8 @@ export default function App() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
+        nodesDraggable = {!_isEditing.current}
+        panOnDrag = {!_isEditing.current}
         fitView
         selectionOnDrag
         multiSelectionKeyCode="Control"
