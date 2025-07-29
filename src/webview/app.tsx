@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef,useLayoutEffect } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -12,9 +12,13 @@ import ReactFlow, {
   NodeChange,
   EdgeChange,
   useReactFlow,
+  ReactFlowProvider,
+  useOnViewportChange,
+  Viewport,
+  useUpdateNodeInternals,
+  useStore,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-
 import CustomNode from './CustomNode';
 import useUndo from 'use-undo';
 
@@ -26,8 +30,8 @@ const nodeTypes = {
   custom: CustomNode,
 };
 
-export default function App() {
-  const { project, getNodes, getEdges } = useReactFlow();
+function FlowApp() {
+  const { getNodes, getEdges} = useReactFlow();
 
   const [
     state,
@@ -49,7 +53,6 @@ export default function App() {
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
 
-  // 복사 노드
   const clipboardRef = useRef<Node[]>([]);
 
   const isInternalUpdate = useRef(false);
@@ -57,33 +60,47 @@ export default function App() {
   const isRedoing = useRef(false);
   const _isEditing = useRef(false);
 
+  const { setViewport, getViewport } = useReactFlow();
+  const prevViewport = useRef<Viewport>(getViewport());
+  const ignoreNextChange = useRef(false);
+
+  useOnViewportChange({
+    onChange: (viewport) => {
+      if (ignoreNextChange.current) {
+        ignoreNextChange.current = false;
+        return; // 다음 변경은 무시
+      }
+
+      const diffX = Math.abs(viewport.x - prevViewport.current.x);
+      if (diffX > 200) {
+        ignoreNextChange.current = true; // 다음 onChange 무시
+        setViewport({
+        x: prevViewport.current.x,
+        y: prevViewport.current.y,
+        zoom: viewport.zoom,
+        }); // 이전 위치로 되돌림
+        return;
+      }
+
+      prevViewport.current = viewport; // 정상 이동이면 갱신
+    },
+  });
+
+  const { screenToFlowPosition } = useReactFlow();
+
   const tracedSetState = (newState: { nodes: Node[]; edges: Edge[] }) => {
-    console.log('📌 setState 호출됨');
-    console.log('새로운 상태:', newState.nodes.length, ', ', newState.edges.length);
     setState(newState);
   };
 
   useEffect(() => {
-    console.log('🕒 현재 상태 업데이트됨');
-    console.log('present:', state.present.nodes);
-    console.log('past length:', state.past.length);
-    console.log('future length:', state.future.length);
     nodesRef.current = nodes;
     edgesRef.current = edges;
   }, [nodes, edges]);
 
-  // ✅ 노드 라벨 변경
   function handleLabelChange(id: string, newLabel: string) {
     const current = nodesRef.current.find((n) => n.id === id);
     const currentLabel = current?.data.label;
-    console.log('newLabel: ', newLabel);
-    console.log('currentLabel: ', currentLabel);
-
-
-    if (currentLabel === newLabel) {
-      console.log(`⚠️ 라벨 동일 → setState 생략됨`);
-      return; // 아무것도 안 바뀜
-    }
+    if (currentLabel === newLabel) return;
 
     const updated = nodesRef.current.map((node) =>
       node.id === id ? { ...node, data: { ...node.data, label: newLabel } } : node
@@ -93,20 +110,13 @@ export default function App() {
   }
 
   function handleEditChange(id: string, isEditing: boolean) {
-    console.log('isEditing:', isEditing);
     _isEditing.current = isEditing;
   }
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
-
-    if (_isEditing.current == true)
-      return;
+    if (_isEditing.current) return;
 
     const filtered = changes.filter(change => {
-      if (change.type === 'position') {
-        return change.dragging === true;
-      }
-
       return change.type !== 'dimensions';
     });
 
@@ -117,8 +127,7 @@ export default function App() {
       return;
     }
 
-    if (filtered.length === 0)
-      return;
+    if (filtered.length === 0) return;
     tracedSetState({ nodes: updated, edges: edgesRef.current });
   }, [tracedSetState]);
 
@@ -135,7 +144,7 @@ export default function App() {
   const addNode = (e: React.MouseEvent<HTMLButtonElement>) => {
     const mouseX = e.clientX;
     const mouseY = e.clientY;
-    const canvasPosition = project({ x: mouseX, y: mouseY });
+    const canvasPosition = screenToFlowPosition({ x: mouseX, y: mouseY });
     const newId = `${++nodeId}`;
 
     const newNode: Node = {
@@ -149,8 +158,6 @@ export default function App() {
       type: 'custom',
     };
 
-    console.log(`노드 ${newId} 추가됨`);
-
     isInternalUpdate.current = true;
     tracedSetState({
       nodes: [...nodesRef.current.map(n => ({ ...n })), newNode],
@@ -159,7 +166,7 @@ export default function App() {
 
     setTimeout(() => {
       isInternalUpdate.current = false;
-    }, 0); // 다음 프레임에서 다시 허용
+    }, 0);
   };
 
   useEffect(() => {
@@ -192,32 +199,27 @@ export default function App() {
       }
 
       if (e.ctrlKey && e.key === 'z') {
-        console.log('canUndo: ', canUndo);
-        console.log('present:', state.present);
-        console.log('past length:', state.past.length);
-        console.log('future length:', state.future.length);
         if (canUndo) {
           isUndoing.current = true;
-          undo()
+          undo();
           setTimeout(() => {
             isUndoing.current = false;
           }, 0);
-        };
+        }
       } else if (e.ctrlKey && e.key === 'y') {
         if (canRedo) {
           isRedoing.current = true;
-          redo()
+          redo();
           setTimeout(() => {
             isRedoing.current = false;
           }, 0);
-        };
+        }
       }
 
       if (e.ctrlKey && e.key === 'c') {
         const selected = getNodes().filter(n => n.selected);
         if (selected.length > 0) {
           clipboardRef.current = selected.map(n => ({ ...n }));
-          console.log('📋 복사됨:', clipboardRef.current);
         }
       }
 
@@ -225,7 +227,7 @@ export default function App() {
         const copied = clipboardRef.current;
         if (copied.length === 0) return;
 
-        const offset = { x: 40, y: 40 }; // 위치 조금 이동해서 붙여넣기
+        const offset = { x: 40, y: 40 };
         const newNodes = copied.map(original => {
           const newId = `${++nodeId}`;
           return {
@@ -256,9 +258,8 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [getNodes, getEdges, canUndo, canRedo, undo, redo, tracedSetState]);
 
-
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
       <button
         onClick={addNode}
         style={{
@@ -290,13 +291,22 @@ export default function App() {
         nodesDraggable={!_isEditing.current}
         panOnDrag={!_isEditing.current}
         fitView
-        selectionOnDrag
+        selectionOnDrag={true}
         multiSelectionKeyCode="Control"
+        panOnScroll={true}
       >
         <MiniMap />
         <Controls />
         <Background />
       </ReactFlow>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ReactFlowProvider>
+      <FlowApp />
+    </ReactFlowProvider>
   );
 }
